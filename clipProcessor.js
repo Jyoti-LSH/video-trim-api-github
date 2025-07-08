@@ -1,29 +1,29 @@
 const ffmpeg = require("fluent-ffmpeg");
-const ytdl = require("ytdl-core");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const axios = require("axios");
 
 /**
- * Downloads a video from a given URL and saves it to a specified path.
- * @param {string} url - The video URL.
- * @param {string} outputPath - Where to save the downloaded video.
+ * Downloads video from a URL to a local file.
  */
-function downloadVideo(url, outputPath) {
-  return new Promise((resolve, reject) => {
-    const stream = ytdl(url, { quality: "highest" })
-      .pipe(fs.createWriteStream(outputPath));
+async function downloadVideo(url, outputPath) {
+  const writer = fs.createWriteStream(outputPath);
+  const response = await axios({
+    url,
+    method: "GET",
+    responseType: "stream",
+  });
 
-    stream.on("finish", () => resolve());
-    stream.on("error", (err) => reject(err));
+  return new Promise((resolve, reject) => {
+    response.data.pipe(writer);
+    writer.on("finish", resolve);
+    writer.on("error", reject);
   });
 }
 
 /**
- * Trims a video into multiple clips.
- * @param {string} inputPath - The source video file.
- * @param {Array<{start: string, end: string}>} clips - Array of start/end timestamps.
- * @returns {Promise<Array<{ clipPath: string }>>}
+ * Trims the input video into multiple clips.
  */
 async function processClips(inputPath, clips) {
   const outputDir = path.dirname(inputPath);
@@ -31,12 +31,13 @@ async function processClips(inputPath, clips) {
 
   for (let index = 0; index < clips.length; index++) {
     const { start, end } = clips[index];
+    const duration = getDuration(start, end);
     const outputFile = path.join(outputDir, `clip_${uuidv4()}.mp4`);
 
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .setStartTime(start)
-        .setDuration(getDuration(start, end))
+        .setDuration(duration)
         .output(outputFile)
         .on("end", () => {
           console.log(`✅ Clip ${index + 1} processed: ${outputFile}`);
@@ -56,9 +57,17 @@ async function processClips(inputPath, clips) {
 }
 
 /**
- * Calculates duration between start and end timestamps (format: HH:MM:SS).
+ * Calculates duration between two timestamps in format HH:MM:SS.
  */
 function getDuration(start, end) {
-  const toSeconds = (timeStr) => {
-    const [h, m, s] = timeStr.split(":").map(Number);
-    return h * 3600 + m *
+  const toSeconds = (time) => {
+    const [h, m, s] = time.split(":").map(Number);
+    return h * 3600 + m * 60 + s;
+  };
+  return toSeconds(end) - toSeconds(start);
+}
+
+module.exports = {
+  downloadVideo,
+  processClips,
+};
