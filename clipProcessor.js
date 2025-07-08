@@ -4,10 +4,9 @@ const ffmpeg = require("fluent-ffmpeg");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 
-// ✅ Download video from direct URL (e.g. Google Drive)
+// 🔹 Download video from any direct URL (e.g., Google Drive export link)
 async function downloadVideo(url, outputPath) {
   const writer = fs.createWriteStream(outputPath);
-
   const response = await axios({
     method: "GET",
     url,
@@ -21,7 +20,7 @@ async function downloadVideo(url, outputPath) {
   });
 }
 
-// 🎬 Process multiple clips
+// 🔹 Process multiple clips
 async function processClips(inputPath, clips) {
   const results = [];
 
@@ -42,7 +41,7 @@ async function processClips(inputPath, clips) {
       });
 
       const base64Data = fs.readFileSync(outputPath, { encoding: "base64" });
-      fs.unlinkSync(outputPath); // delete temp file
+      fs.unlinkSync(outputPath); // Clean up trimmed file
 
       results.push({
         index,
@@ -58,14 +57,14 @@ async function processClips(inputPath, clips) {
   return results;
 }
 
-// ⏱️ Get duration in seconds from HH:MM:SS
+// 🔹 Helper to get clip duration
 function getDuration(start, end) {
   const startSecs = timeToSeconds(start);
   const endSecs = timeToSeconds(end);
   return endSecs - startSecs;
 }
 
-// 🕒 Convert time to seconds
+// 🔹 Convert HH:MM:SS to seconds
 function timeToSeconds(timeStr) {
   const parts = timeStr.split(":").map(Number);
   return parts[0] * 3600 + parts[1] * 60 + parts[2];
