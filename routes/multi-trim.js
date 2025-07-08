@@ -12,7 +12,7 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Missing video_url or clips array" });
   }
 
-  const inputPath = path.join(__dirname, `../input_${uuidv4()}.mp4`);
+  const inputPath = path.join(__dirname, `input_${uuidv4()}.mp4`);
 
   try {
     await downloadVideo(video_url, inputPath);
