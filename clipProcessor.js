@@ -1,5 +1,11 @@
 const ffmpeg = require("fluent-ffmpeg");
+const fs = require("fs");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 
+/**
+ * Download a video from a URL to a local file using FFmpeg
+ */
 function downloadVideo(videoUrl, outputPath) {
   return new Promise((resolve, reject) => {
     console.log("🚀 Starting download from:", videoUrl);
@@ -21,3 +27,12 @@ function downloadVideo(videoUrl, outputPath) {
       .save(outputPath);
   });
 }
+
+/**
+ * Process multiple clips from an input video
+ */
+function processClips(inputPath, clips) {
+  return Promise.all(
+    clips.map((clip, index) => {
+      return new Promise((resolve, reject) => {
+        const outputF
