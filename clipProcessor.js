@@ -1,20 +1,27 @@
 const fs = require("fs");
-const ytdl = require("ytdl-core");
+const axios = require("axios");
 const ffmpeg = require("fluent-ffmpeg");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 
-// Download video from URL
+// ✅ Download video from direct URL (e.g. Google Drive)
 async function downloadVideo(url, outputPath) {
+  const writer = fs.createWriteStream(outputPath);
+
+  const response = await axios({
+    method: "GET",
+    url,
+    responseType: "stream",
+  });
+
   return new Promise((resolve, reject) => {
-    const videoStream = ytdl(url, { quality: "highestvideo" });
-    videoStream.pipe(fs.createWriteStream(outputPath));
-    videoStream.on("end", () => resolve());
-    videoStream.on("error", reject);
+    response.data.pipe(writer);
+    writer.on("finish", resolve);
+    writer.on("error", reject);
   });
 }
 
-// Process multiple clips
+// 🎬 Process multiple clips
 async function processClips(inputPath, clips) {
   const results = [];
 
@@ -29,7 +36,7 @@ async function processClips(inputPath, clips) {
           .setStartTime(start)
           .setDuration(getDuration(start, end))
           .output(outputPath)
-          .on("end", () => resolve())
+          .on("end", resolve)
           .on("error", reject)
           .run();
       });
@@ -51,14 +58,14 @@ async function processClips(inputPath, clips) {
   return results;
 }
 
-// Helper to get clip duration
+// ⏱️ Get duration in seconds from HH:MM:SS
 function getDuration(start, end) {
   const startSecs = timeToSeconds(start);
   const endSecs = timeToSeconds(end);
   return endSecs - startSecs;
 }
 
-// Convert HH:MM:SS to seconds
+// 🕒 Convert time to seconds
 function timeToSeconds(timeStr) {
   const parts = timeStr.split(":").map(Number);
   return parts[0] * 3600 + parts[1] * 60 + parts[2];
