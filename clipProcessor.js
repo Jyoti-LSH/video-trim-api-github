@@ -1,70 +1,67 @@
-const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs");
-const path = require("path");
+const ytdl = require("ytdl-core");
+const ffmpeg = require("fluent-ffmpeg");
 const { v4: uuidv4 } = require("uuid");
-const axios = require("axios");
+const path = require("path");
 
-/**
- * Downloads video from a URL to a local file.
- */
+// Download video from URL
 async function downloadVideo(url, outputPath) {
-  const writer = fs.createWriteStream(outputPath);
-  const response = await axios({
-    url,
-    method: "GET",
-    responseType: "stream",
-  });
-
   return new Promise((resolve, reject) => {
-    response.data.pipe(writer);
-    writer.on("finish", resolve);
-    writer.on("error", reject);
+    const videoStream = ytdl(url, { quality: "highestvideo" });
+    videoStream.pipe(fs.createWriteStream(outputPath));
+    videoStream.on("end", () => resolve());
+    videoStream.on("error", reject);
   });
 }
 
-/**
- * Trims the input video into multiple clips.
- */
+// Process multiple clips
 async function processClips(inputPath, clips) {
-  const outputDir = path.dirname(inputPath);
-  const processedClips = [];
+  const results = [];
 
   for (let index = 0; index < clips.length; index++) {
     const { start, end } = clips[index];
-    const duration = getDuration(start, end);
-    const outputFile = path.join(outputDir, `clip_${uuidv4()}.mp4`);
+    const outputFilename = `clip_${uuidv4()}.mp4`;
+    const outputPath = path.join(__dirname, outputFilename);
 
-    await new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
-        .setStartTime(start)
-        .setDuration(duration)
-        .output(outputFile)
-        .on("end", () => {
-          console.log(`✅ Clip ${index + 1} processed: ${outputFile}`);
-          processedClips.push({ clipPath: outputFile });
-          resolve();
-        })
-        .on("error", (err, stdout, stderr) => {
-          console.error(`❌ Error trimming clip ${index + 1}:`, err.message);
-          console.error("📄 FFmpeg stderr:\n", stderr);
-          reject(err);
-        })
-        .run();
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+          .setStartTime(start)
+          .setDuration(getDuration(start, end))
+          .output(outputPath)
+          .on("end", () => resolve())
+          .on("error", reject)
+          .run();
+      });
+
+      const base64Data = fs.readFileSync(outputPath, { encoding: "base64" });
+      fs.unlinkSync(outputPath); // delete temp file
+
+      results.push({
+        index,
+        filename: outputFilename,
+        base64: base64Data,
+      });
+    } catch (err) {
+      console.error(`❌ Error trimming clip ${index}:`, err.message);
+      results.push({ index, error: err.message });
+    }
   }
 
-  return processedClips;
+  return results;
 }
 
-/**
- * Calculates duration between two timestamps in format HH:MM:SS.
- */
+// Helper to get clip duration
 function getDuration(start, end) {
-  const toSeconds = (time) => {
-    const [h, m, s] = time.split(":").map(Number);
-    return h * 3600 + m * 60 + s;
-  };
-  return toSeconds(end) - toSeconds(start);
+  const startSecs = timeToSeconds(start);
+  const endSecs = timeToSeconds(end);
+  return endSecs - startSecs;
+}
+
+// Convert HH:MM:SS to seconds
+function timeToSeconds(timeStr) {
+  const parts = timeStr.split(":").map(Number);
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
 }
 
 module.exports = {
